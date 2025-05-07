@@ -1,0 +1,58 @@
+[
+  {
+    "objectID": "Lab-10-REAL.html",
+    "href": "Lab-10-REAL.html",
+    "title": "",
+    "section": "",
+    "text": "CodeShow All CodeHide All CodeView Source\nCode\nknitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)\nCode\nlibrary(tidyverse)\nlibrary(sf)\nlibrary(units)\nlibrary(AOI)\nlibrary(ggrepel)\nlibrary(knitr)\nlibrary(gghighlight)\nlibrary(remotes)\nlibrary(readr)\nlibrary(rnaturalearth)\nlibrary(USAboundaries)\nlibrary(ggthemes)\ntheme_set(theme_map())\nCode\nremotes::install_github(\"ropensci/USAboundaries\")\n\nremotes::install_github(\"ropensci/USAboundariesData\")\n\nremotes::install_github(\"mikejohnson51/AOI\")\n\nremotes::install_github(\"ropenscilabs/rnaturalearthdata\")"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#section",
+    "href": "Lab-10-REAL.html#section",
+    "title": "",
+    "section": "1 1.1",
+    "text": "1 1.1\n\n\nCode\neqdc &lt;- '+proj=eqdc +lat_0=40 +lon_0=-96 +lat_1=20 +lat_2=60 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs'"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#section-1",
+    "href": "Lab-10-REAL.html#section-1",
+    "title": "",
+    "section": "2 1.2",
+    "text": "2 1.2\n\n\nCode\nstates &lt;- aoi_get(state = \"conus\")\nstates_eqdc &lt;- st_transform(states, crs = eqdc)"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#section-2",
+    "href": "Lab-10-REAL.html#section-2",
+    "title": "",
+    "section": "3 1.3",
+    "text": "3 1.3\n\n\nCode\naoi_get(country = c(\"MX\", \"CA\", \"USA\"))\n\neqdc &lt;- st_crs(5070)\n\ncountries &lt;- rnaturalearth::countries110 |&gt;\n  st_transform(eqdc)\n\nstates &lt;- USAboundaries::us_states(resolution = \"low\") |&gt;\n  filter(!state_abbr %in% c(\"HI\", \"AK\", \"PR\"))|&gt;\n  st_transform(eqdc)"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#section-3",
+    "href": "Lab-10-REAL.html#section-3",
+    "title": "",
+    "section": "4 1.4",
+    "text": "4 1.4\n\n\nCode\ncities_raw &lt;- read_csv(\"data/uscities.csv\")\n\nglimpse(cities_raw)\n\n\nRows: 31,254\nColumns: 17\n$ city         &lt;chr&gt; \"New York\", \"Los Angeles\", \"Chicago\", \"Miami\", \"Houston\",…\n$ city_ascii   &lt;chr&gt; \"New York\", \"Los Angeles\", \"Chicago\", \"Miami\", \"Houston\",…\n$ state_id     &lt;chr&gt; \"NY\", \"CA\", \"IL\", \"FL\", \"TX\", \"TX\", \"PA\", \"GA\", \"DC\", \"MA…\n$ state_name   &lt;chr&gt; \"New York\", \"California\", \"Illinois\", \"Florida\", \"Texas\",…\n$ county_fips  &lt;chr&gt; \"36081\", \"06037\", \"17031\", \"12086\", \"48201\", \"48113\", \"42…\n$ county_name  &lt;chr&gt; \"Queens\", \"Los Angeles\", \"Cook\", \"Miami-Dade\", \"Harris\", …\n$ lat          &lt;dbl&gt; 40.6943, 34.1141, 41.8375, 25.7840, 29.7860, 32.7935, 40.…\n$ lng          &lt;dbl&gt; -73.9249, -118.4068, -87.6866, -80.2101, -95.3885, -96.76…\n$ population   &lt;dbl&gt; 18832416, 11885717, 8489066, 6113982, 6046392, 5843632, 5…\n$ density      &lt;dbl&gt; 10943.7, 3165.8, 4590.3, 4791.1, 1386.5, 1477.2, 4547.5, …\n$ source       &lt;chr&gt; \"shape\", \"shape\", \"shape\", \"shape\", \"shape\", \"shape\", \"sh…\n$ military     &lt;lgl&gt; FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, FALSE, F…\n$ incorporated &lt;lgl&gt; TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRUE, TRU…\n$ timezone     &lt;chr&gt; \"America/New_York\", \"America/Los_Angeles\", \"America/Chica…\n$ ranking      &lt;dbl&gt; 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, …\n$ zips         &lt;chr&gt; \"11229 11226 11225 11224 11223 11221 11220 11385 10169 10…\n$ id           &lt;dbl&gt; 1840034016, 1840020491, 1840000494, 1840015149, 184002092…\n\n\nCode\nlibrary(readr)\ncities &lt;- read_csv(\"data/uscities.csv\", show_col_types = FALSE)|&gt;\n  st_as_sf(coords = c(\"lng\", \"lat\"), crs = 4326)|&gt;\n  st_transform(eqdc)"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#question-2",
+    "href": "Lab-10-REAL.html#question-2",
+    "title": "",
+    "section": "5 Question 2",
+    "text": "5 Question 2\n\n\nCode\nlibrary(tidyverse)\nlibrary(sf)\nlibrary(units)\nlibrary(flextable)\n\nstate_borders &lt;- states |&gt;\n  st_geometry() |&gt; \n  st_combine() |&gt; \n  st_cast(\"MULTILINESTRING\")\n\ncities$dist_to_state_border &lt;- st_distance(cities, state_borders) |&gt;\n  set_units(\"km\") |&gt; \n  drop_units()\n\ntop5_state_border &lt;- cities |&gt; \n  select(city, state_name, dist_to_state_border) |&gt; \n  arrange(desc(dist_to_state_border)) |&gt; \n  slice_head(n = 5)\n\nflextable(top5_state_border)\n\n\ncitystate_namedist_to_state_bordergeometryAttu StationAlaska4,433.027[[XY]]Eareckson StationAlaska4,369.904[[XY]]KekahaHawaii3,888.183[[XY]]KaumakaniHawaii3,884.624[[XY]]Pakala VillageHawaii3,884.321[[XY]]\n\n\n\n\nCode\nusa_outline &lt;- states |&gt; \n  st_union() |&gt; \n  st_cast(\"MULTILINESTRING\")\n\ncities$dist_to_national_border &lt;- st_distance(cities, usa_outline) |&gt;\n  set_units(\"km\") |&gt;\n  drop_units()\n\ntop5_national &lt;- cities |&gt; \n  select(city, state_name, dist_to_national_border) |&gt; \n  arrange(desc(dist_to_national_border)) |&gt; \n  slice_head(n = 5)\n\nflextable(top5_national)\n\n\ncitystate_namedist_to_national_bordergeometryAttu StationAlaska4,433.027[[XY]]Eareckson StationAlaska4,369.904[[XY]]KekahaHawaii3,888.183[[XY]]KaumakaniHawaii3,884.624[[XY]]Pakala VillageHawaii3,884.321[[XY]]\n\n\n\n\nCode\nmexico_border &lt;- countries |&gt; filter(NAME == \"Mexico\") |&gt; \n  st_union() |&gt; \n  st_cast(\"MULTILINESTRING\")\n\ncities$dist_to_mexico &lt;- st_distance(cities, mexico_border) |&gt;\n  set_units(\"km\") |&gt;\n  drop_units()\n\ntop5_mexico &lt;- cities |&gt; \n  select(city, state_name, dist_to_mexico) |&gt; \n  arrange(desc(dist_to_mexico)) |&gt; \n  slice_head(n = 5)\n\nflextable(top5_mexico)\n\n\ncitystate_namedist_to_mexicogeometryAttu StationAlaska5,946.234[[XY]]Eareckson StationAlaska5,877.355[[XY]]AdakAlaska5,223.146[[XY]]GambellAlaska5,199.374[[XY]]Point HopeAlaska5,132.388[[XY]]\n\n\n\n\nCode\ncanada_border &lt;- countries |&gt; filter(NAME == \"Canada\") |&gt; \n  st_union() |&gt; \n  st_cast(\"MULTILINESTRING\")\n\ncities$dist_to_canada &lt;- st_distance(cities, canada_border) |&gt;\n  set_units(\"km\") |&gt;\n  drop_units()\n\ntop5_canada &lt;- cities |&gt; \n  select(city, state_name, dist_to_canada) |&gt; \n  arrange(desc(dist_to_canada)) |&gt; \n  slice_head(n = 5)\n\nflextable(top5_canada)\n\n\ncitystate_namedist_to_canadageometryHawaiian Ocean ViewHawaii4,212.302[[XY]]Discovery HarbourHawaii4,209.737[[XY]]WaiohinuHawaii4,206.358[[XY]]NaalehuHawaii4,204.487[[XY]]PahalaHawaii4,187.248[[XY]]"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#question-3",
+    "href": "Lab-10-REAL.html#question-3",
+    "title": "",
+    "section": "6 Question 3",
+    "text": "6 Question 3\n\n\nCode\ntop10_cities &lt;- cities |&gt; \n  slice_max(population, n = 10)\n\nggplot() +\n  geom_sf(data = countries, fill = \"grey95\", color = \"gray80\") +\n  geom_sf(data = states, fill = NA, color = \"black\", linetype = \"dotted\", size = 0.4) +\n  geom_sf(data = states, fill = NA, lty = 2, size = 0.3) +\n  geom_sf(data = top10_cities, color = \"red\", size = 2) +\n  ggrepel::geom_label_repel(data = top10_cities,\n                            aes(geometry = geometry, label = city),\n                            stat = \"sf_coordinates\",\n                            label.size = 0.2) +\n  theme_void() +\n  labs(title = \"Top 10 Most Populous U.S. Cities\")\n\n\n\n\n\n\n\n\n\n\n\nCode\ntop5_natl &lt;- cities |&gt; \n  slice_max(dist_to_national_border, n = 5)\n\nggplot() +\n  geom_sf(data = states, fill = NA, color = \"black\") +\n  geom_sf(data = cities, aes(color = dist_to_national_border), size = 1) +\n  geom_sf(data = top5_natl, color = \"red\", size = 2) +\n  ggrepel::geom_label_repel(data = top5_natl,\n                            aes(geometry = geometry, label = city),\n                            stat = \"sf_coordinates\",\n                            label.size = 0.2) +\n  scale_color_viridis_c() +\n  labs(color = \"Distance to National Border (km)\") +\n  theme_void() +\n  theme(legend.position = \"right\")\n\n\n\n\n\n\n\n\n\n\n\nCode\ntop5_state &lt;- cities |&gt; \n  slice_max(dist_to_state_border, n = 5)\n\nggplot() +\n  geom_sf(data = states, fill = NA, color = \"gray60\", linewidth = 0.3) +\n  geom_sf(data = cities, aes(color = dist_to_state_border), size = 1) +\n  geom_sf(data = top5_state, color = \"blue\", size = 2) +\n  ggrepel::geom_label_repel(data = top5_state,\n                            aes(geometry = geometry, label = city),\n                            stat = \"sf_coordinates\",\n                            label.size = 0.2) +\n  scale_color_viridis_c() +\n  labs(color = \"Distance to State Border (km)\") +\n  ggthemes::theme_map() +\n  theme(legend.position = \"right\")\n\n\n\n\n\n\n\n\n\n\n\nCode\ncities &lt;- cities |&gt; \n  mutate(can_mx_diff = abs(dist_to_canada - dist_to_mexico))\n\nequidist_cities &lt;- cities |&gt; \n  filter(can_mx_diff &lt; 100)\n\ntop5_equidist &lt;- equidist_cities |&gt; \n  slice_max(population, n = 5)\n\n\n\n\nCode\nggplot() +\n  geom_sf(data = states, fill = NA, color = \"grey60\", linewidth = 0.3) +\n  geom_sf(data = cities, aes(color = can_mx_diff), size = 0.8) +\n  geom_sf(data = top5_equidist, color = \"red\", size = 2) +\n  ggrepel::geom_label_repel(data = top5_equidist,\n                            aes(geometry = geometry, label = city),\n                            stat = \"sf_coordinates\",\n                            label.size = 0.2) +\n  scale_color_viridis_c() +\n  gghighlight(can_mx_diff &lt; 100) +\n  labs(color = \"Canada–Mexico Distance Diff (km)\") +\n  ggthemes::theme_map() +\n  theme(legend.position = \"right\")"
+  },
+  {
+    "objectID": "Lab-10-REAL.html#question-4",
+    "href": "Lab-10-REAL.html#question-4",
+    "title": "",
+    "section": "7 Question 4",
+    "text": "7 Question 4\n\n\nCode\n# Define the total border (Canada + Mexico) to compare distance\nborder &lt;- st_union(st_geometry(canada_border), st_geometry(mexico_border)) |&gt; \n  st_cast(\"MULTILINESTRING\")\n\n# Add combined border distance\ncities$border_km &lt;- set_units(st_distance(cities, border), \"km\") |&gt; drop_units()\n\n# Cities within 160 km (~100 miles) of international borders\ndanger_zone &lt;- cities |&gt; filter(border_km &lt;= 160)\n\n# Summarize results\ntotal_cities &lt;- nrow(cities)\ntotal_pop &lt;- sum(cities$population, na.rm = TRUE)\ndanger_zone_cities &lt;- nrow(danger_zone)\ndanger_zone_pop &lt;- sum(danger_zone$population, na.rm = TRUE)\npercent_pop &lt;- 100 * danger_zone_pop / total_pop\n\n# Summary table\nborder_zone_summary &lt;- tibble(\n  `Total Cities` = total_cities,\n  `Cities in 100 Mile Zone` = danger_zone_cities,\n  `Population in Zone` = danger_zone_pop,\n  `Total Population` = total_pop,\n  `% in Zone` = round(percent_pop, 2)\n)\n\nknitr::kable(border_zone_summary)\n\n\n\n\n\n\n\n\n\n\n\n\nTotal Cities\nCities in 100 Mile Zone\nPopulation in Zone\nTotal Population\n% in Zone\n\n\n\n\n31254\n3391\n45266753\n402301854\n11.25\n\n\n\n\n\n\n\nCode\nggplot() +\n  geom_sf(data = states, fill = NA, color = \"gray50\") +\n  geom_sf(data = cities, aes(color = population), alpha = 0.3) +\n  geom_sf(data = danger_zone, aes(color = population)) +\n  gghighlight(border_km &lt;= 160) +\n  scale_color_viridis_c(option = \"magma\", trans = \"log10\") +\n  geom_label_repel(\n    data = danger_zone |&gt; slice_max(population, n = 10),\n    aes(label = city, geometry = geometry),\n    stat = \"sf_coordinates\",\n    size = 3\n  ) +\n  labs(\n    title = \"U.S. Cities Within 100 Miles of Border\",\n    subtitle = \"Top 10 Most Populous Cities Highlighted\",\n    color = \"Population\"\n  ) +\n  theme_minimal()"
+  }
+]

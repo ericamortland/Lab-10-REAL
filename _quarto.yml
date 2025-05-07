@@ -1,0 +1,16 @@
+project:
+  type: website
+  output-dir: docs
+  title: "Lab 10: Distances and the Border Zone"
+
+format:
+  html:
+    self-contained: true
+    toc: true
+    toc-depth: 2
+    code-fold: true
+    code-tools: true
+    number-sections: true
+    theme: cosmo
+    highlight-style: github
+
