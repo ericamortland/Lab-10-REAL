@@ -3,6 +3,8 @@ project:
   type: website
   output-dir: docs
   title: "Lab 10: Distances and the Border Zone"
+  author: Erica Mortland
+  date: "`r Sys.Date()`"
 
 format:
   html:
@@ -50,6 +52,8 @@ remotes::install_github("ropenscilabs/rnaturalearthdata")
 
 ## 1.1
 
+### Define a conic projection centered over the continental US
+
 ```{r}
 eqdc <- '+proj=eqdc +lat_0=40 +lon_0=-96 +lat_1=20 +lat_2=60 +x_0=0 +y_0=0 +datum=NAD83 +units=m +no_defs'
 ```
@@ -71,8 +75,8 @@ eqdc <- st_crs(5070)
 countries <- rnaturalearth::countries110 |>
   st_transform(eqdc)
 
-states <- USAboundaries::us_states(resolution = "low") |>
-  filter(!state_abbr %in% c("HI", "AK", "PR"))|>
+countries <- rnaturalearth::ne_countries(scale = "medium", returnclass = "sf") |>
+  filter(admin %in% c("Mexico", "Canada", "United States of America")) |>
   st_transform(eqdc)
 
 ```
@@ -98,16 +102,21 @@ library(sf)
 library(units)
 library(flextable)
 
-state_borders <- states |>
+# Create a MULTILINESTRING object from all state borders
+state_borders <- states |> 
   st_geometry() |> 
   st_combine() |> 
   st_cast("MULTILINESTRING")
 
-cities$dist_to_state_border <- st_distance(cities, state_borders) |>
+state_borders_eqdc <- state_borders |> st_transform(eqdc)
+cities_eqdc <- cities |> st_transform(eqdc)
+
+# Compute distances
+cities_eqdc$dist_to_state_border <- st_distance(cities_eqdc, state_borders_eqdc) |>
   set_units("km") |> 
   drop_units()
 
-top5_state_border <- cities |> 
+top5_state_border <- cities_eqdc |> 
   select(city, state_name, dist_to_state_border) |> 
   arrange(desc(dist_to_state_border)) |> 
   slice_head(n = 5)
@@ -116,15 +125,17 @@ flextable(top5_state_border)
 ```
 
 ```{r}
-usa_outline <- states |> 
-  st_union() |> 
-  st_cast("MULTILINESTRING")
 
-cities$dist_to_national_border <- st_distance(cities, usa_outline) |>
+usa_outline_eqdc <- states |> 
+  st_union() |> 
+  st_cast("MULTILINESTRING") |>
+  st_transform(eqdc)
+
+cities$dist_to_national_border <- st_distance(cities, usa_outline_eqdc) |>
   set_units("km") |>
   drop_units()
 
-top5_national <- cities |> 
+top5_national <- cities |>  
   select(city, state_name, dist_to_national_border) |> 
   arrange(desc(dist_to_national_border)) |> 
   slice_head(n = 5)
@@ -133,7 +144,9 @@ flextable(top5_national)
 ```
 
 ```{r}
-mexico_border <- countries |> filter(NAME == "Mexico") |> 
+states_eqdc <- states |> st_transform(eqdc)
+countries_eqdc <- countries |> st_transform(eqdc)
+mexico_border <- countries |> filter(admin == "Mexico") |> 
   st_union() |> 
   st_cast("MULTILINESTRING")
 
@@ -150,7 +163,7 @@ flextable(top5_mexico)
 ```
 
 ```{r}
-canada_border <- countries |> filter(NAME == "Canada") |> 
+canada_border <- countries |> filter(admin == "Canada") |> 
   st_union() |> 
   st_cast("MULTILINESTRING")
 
@@ -183,6 +196,12 @@ ggplot() +
                             label.size = 0.2) +
   theme_void() +
   labs(title = "Top 10 Most Populous U.S. Cities")
+
+top10_table <- top10_cities |> 
+  st_drop_geometry() |> 
+  select(city, state_name, population)
+
+flextable(top10_table)
 ```
 
 ```{r}
@@ -204,8 +223,14 @@ ggplot() +
 ```
 
 ```{r}
+state_borders <- st_transform(state_borders, st_crs(cities))
+
+cities$dist_to_state_border <- st_distance(cities, state_borders) |>
+  set_units("km") |>
+  drop_units()
+
 top5_state <- cities |> 
-  slice_max(dist_to_state_border, n = 5)
+  slice_max(order_by = dist_to_state_border, n = 5)
 
 ggplot() +
   geom_sf(data = states, fill = NA, color = "gray60", linewidth = 0.3) +
@@ -222,6 +247,9 @@ ggplot() +
 ```
 
 ```{r}
+cities <- cities |> 
+  mutate(can_mx_diff = as.numeric(abs(dist_to_canada - dist_to_mexico)))
+
 cities <- cities |> 
   mutate(can_mx_diff = abs(dist_to_canada - dist_to_mexico))
 
@@ -248,27 +276,28 @@ ggplot() +
   theme(legend.position = "right")
 ```
 
+```{r}
+flextable(top5_equidist |> st_drop_geometry() |> 
+            select(city, state_name, population, can_mx_diff))
+
+```
+
 ## Question 4
 
 ```{r}
-# Define the total border (Canada + Mexico) to compare distance
 border <- st_union(st_geometry(canada_border), st_geometry(mexico_border)) |> 
   st_cast("MULTILINESTRING")
 
-# Add combined border distance
 cities$border_km <- set_units(st_distance(cities, border), "km") |> drop_units()
 
-# Cities within 160 km (~100 miles) of international borders
 danger_zone <- cities |> filter(border_km <= 160)
 
-# Summarize results
 total_cities <- nrow(cities)
 total_pop <- sum(cities$population, na.rm = TRUE)
 danger_zone_cities <- nrow(danger_zone)
 danger_zone_pop <- sum(danger_zone$population, na.rm = TRUE)
 percent_pop <- 100 * danger_zone_pop / total_pop
 
-# Summary table
 border_zone_summary <- tibble(
   `Total Cities` = total_cities,
   `Cities in 100 Mile Zone` = danger_zone_cities,
@@ -294,9 +323,36 @@ ggplot() +
     size = 3
   ) +
   labs(
-    title = "U.S. Cities Within 100 Miles of Border",
-    subtitle = "Top 10 Most Populous Cities Highlighted",
-    color = "Population"
-  ) +
+  title = "U.S. Cities in the Danger Zone (100 miles from Border)",
+  subtitle = "Most Populous City in Each State"
+) +
   theme_minimal()
 ```
+
+```{r}
+top_per_state <- danger_zone |> 
+  group_by(state_name) |> 
+  slice_max(population, n = 1) |> 
+  ungroup()
+
+ggplot() +
+  geom_sf(data = states, fill = NA, color = "gray50") +
+  geom_sf(data = danger_zone, aes(color = population)) +
+  geom_sf(data = top_per_state, color = "red", size = 2) +
+  geom_label_repel(
+    data = top_per_state,
+    aes(label = city, geometry = geometry),
+    stat = "sf_coordinates",
+    size = 3
+  ) +
+  labs(
+    title = "Most Populous City in Each State within the Danger Zone",
+    subtitle = "Cities within 100 miles of Canada or Mexico",
+    color = "Population"
+  ) +
+  scale_color_viridis_c(option = "magma", trans = "log10") +
+  theme_minimal()
+```
+
+
+
